@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>India Gold Rate Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+<style>
+:root{--bg:#f6f7fb;--card:#fff;--ink:#1d2433;--muted:#70798b;--gold:#c99a24;--gold2:#f1d98d;--line:#e8ebf1;--green:#16865b;--red:#c74747;--navy:#17233b}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
+header{background:linear-gradient(120deg,#17233b,#283b5b);color:#fff;padding:26px max(22px,calc((100% - 1220px)/2));display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap}
+.brand{display:flex;gap:13px;align-items:center}.logo{width:48px;height:48px;border-radius:14px;background:linear-gradient(145deg,#f8e7a9,#c99a24);color:#17233b;display:grid;place-items:center;font-size:25px;font-weight:900}.brand h1{font-size:22px;margin:0}.brand p{margin:3px 0 0;color:#c8d2e4;font-size:13px}
+.header-right{font-size:12px;color:#dce4f2;text-align:right}.wrap{max-width:1220px;margin:26px auto;padding:0 22px}
+.toolbar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:20px}.toolbar input[type=url]{flex:1;min-width:250px}.field,button{font:inherit;border:1px solid var(--line);border-radius:10px;padding:11px 13px;background:white;color:var(--ink)}button{cursor:pointer;font-weight:650}.primary{background:var(--gold);border-color:var(--gold);color:#fff}.primary:hover{filter:brightness(.95)}.toolbar label{font-size:13px;color:var(--muted)}.toolbar .small{font-size:12px;color:var(--muted)}
+.status{padding:12px 15px;border-radius:10px;background:#fff8df;border:1px solid #f1dfa0;color:#755914;margin-bottom:20px;font-size:13px}.status.ok{background:#e9f8f0;border-color:#b7e8cf;color:#176b49}.status.error{background:#fff0f0;border-color:#f2caca;color:#9d3030}
+.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px;box-shadow:0 4px 18px #1a2a4507;min-width:0}.metric-label{font-size:13px;color:var(--muted);font-weight:600}.metric-value{font-size:27px;letter-spacing:-.8px;font-weight:800;margin:9px 0 4px;overflow-wrap:anywhere}.metric-sub{font-size:12px;color:var(--muted)}.pill{display:inline-block;border-radius:99px;background:#f7edcf;color:#8d6811;padding:3px 8px;font-size:11px;font-weight:700;margin-top:8px}
+.section{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(280px,1fr);gap:16px;margin-top:16px}.card-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:14px}.card h2{font-size:16px;margin:0}.card-head p{font-size:12px;color:var(--muted);margin:4px 0 0}.filters{display:flex;gap:8px;flex-wrap:wrap}.filters select,.filters input{border:1px solid var(--line);border-radius:8px;padding:8px;background:#fff;color:var(--ink);max-width:100%}.chartbox{height:300px;position:relative}.insights{display:grid;gap:12px}.insight{padding:13px;border:1px solid var(--line);border-radius:12px}.insight .k{font-size:12px;color:var(--muted)}.insight .v{font-size:18px;font-weight:750;margin-top:3px}.table-card{margin-top:16px}.table-scroll{overflow:auto}table{width:100%;border-collapse:collapse;white-space:nowrap}th,td{text-align:left;padding:12px 14px;border-bottom:1px solid var(--line);font-size:13px}th{color:var(--muted);font-weight:650;background:#fafbfc}td.num{text-align:right;font-variant-numeric:tabular-nums}th.num{text-align:right}.empty{text-align:center;padding:30px;color:var(--muted)}footer{padding:25px 10px 35px;text-align:center;color:var(--muted);font-size:12px}.source-note{font-size:12px;color:var(--muted);margin-top:12px}
+@media(max-width:900px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.section{grid-template-columns:1fr}}@media(max-width:520px){header{padding:20px}.wrap{padding:0 13px;margin-top:16px}.grid{gap:10px}.card{padding:15px}.metric-value{font-size:22px}.toolbar input[type=url]{min-width:100%}.chartbox{height:250px}.header-right{text-align:left}}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand"><div class="logo">₹</div><div><h1>India Gold Rate Dashboard</h1><p>Gold price trends • Historical records • INR</p></div></div>
+  <div class="header-right"><div id="todayLabel">Dashboard</div><div>Source: Google Sheets</div></div>
+</header>
+<main class="wrap">
+  <div class="toolbar">
+    <input class="field" id="sheetUrl" type="url" aria-label="Google Sheet URL" value="https://docs.google.com/spreadsheets/d/1TtuYAGWwFT9PEgUNoKMNqlBgZbg92776/edit?usp=sharing" placeholder="Paste a public Google Sheets URL">
+    <button class="primary" id="loadBtn">Load sheet data</button>
+    <label for="csvFile">or upload CSV</label><input id="csvFile" type="file" accept=".csv,text/csv" class="field">
+    <button id="demoBtn" title="Load example layout with no fabricated rates">Reset view</button>
+  </div>
+  <div id="status" class="status">Ready to connect. The sheet must be shared as “Anyone with the link — Viewer”. If loading is blocked by browser access rules, download the sheet as CSV and upload it here.</div>
+  <section class="grid" aria-label="Gold rate summary">
+    <article class="card"><div class="metric-label">Latest recorded date</div><div class="metric-value" id="latestDate">—</div><div class="metric-sub">From source data</div><span class="pill">LATEST RECORD</span></article>
+    <article class="card"><div class="metric-label">24K Gold / gram</div><div class="metric-value" id="rate24">—</div><div class="metric-sub" id="rate24sub">No verified rate loaded</div></article>
+    <article class="card"><div class="metric-label">22K Gold / gram</div><div class="metric-value" id="rate22">—</div><div class="metric-sub" id="rate22sub">No verified rate loaded</div></article>
+    <article class="card"><div class="metric-label">Daily change</div><div class="metric-value" id="dailyChange">—</div><div class="metric-sub" id="dailyChangeSub">Requires at least two dates</div></article>
+  </section>
+  <section class="section">
+    <article class="card">
+      <div class="card-head"><div><h2>Historical gold price</h2><p>Choose a rate series and date range</p></div>
+        <div class="filters"><select id="puritySelect" aria-label="Gold purity"><option value="auto">Auto-detect rate</option></select><input type="date" id="fromDate" aria-label="Start date"><input type="date" id="toDate" aria-label="End date"></div>
+      </div>
+      <div class="chartbox"><canvas id="goldChart" aria-label="Historical gold price chart"></canvas></div>
+      <div class="source-note">Chart values are plotted from your sheet; units follow the selected source column.</div>
+    </article>
+    <article class="card">
+      <div class="card-head"><div><h2>Price snapshot</h2><p>Latest date vs previous available date</p></div></div>
+      <div class="insights">
+        <div class="insight"><div class="k">24K price per 10 grams</div><div class="v" id="ten24">—</div></div>
+        <div class="insight"><div class="k">22K price per 10 grams</div><div class="v" id="ten22">—</div></div>
+        <div class="insight"><div class="k">Record count</div><div class="v" id="recordCount">0</div></div>
+        <div class="insight"><div class="k">Available date range</div><div class="v" id="dateRange" style="font-size:14px">—</div></div>
+      </div>
+      <div class="source-note">Per 10g figures are calculated from per-gram values only when the source unit can be identified.</div>
+    </article>
+  </section>
+  <section class="card table-card">
+    <div class="card-head"><div><h2>Historical records</h2><p>Newest dates first • filtered by the selected date range</p></div><div class="filters"><input id="tableSearch" type="search" placeholder="Search records…" aria-label="Search records"></div></div>
+    <div class="table-scroll"><table><thead id="tableHead"></thead><tbody id="tableBody"><tr><td class="empty">Load a public sheet or upload a CSV to see records.</td></tr></tbody></table></div>
+  </section>
+  <footer>Gold rates can vary by city, taxes, making charges and source. This dashboard reports source-sheet values and does not provide financial advice.</footer>
+</main>
+<script>
+const SHEET_ID='1TtuYAGWwFT9PEgUNoKMNqlBgZbg92776';
+let rows=[], headers=[], chart=null, dateKey=null, rateKeys=[];
+const $=id=>document.getElementById(id);
+const status=(msg,kind='')=>{$('status').textContent=msg;$('status').className='status '+kind};
+const norm=s=>String(s??'').toLowerCase().trim().replace(/[^a-z0-9]+/g,' ');
+function num(v){if(typeof v==='number')return Number.isFinite(v)?v:null; if(v==null)return null;let s=String(v).trim().replace(/[₹,\s]/g,'').replace(/(inr|rs\.?)/ig,'');if(!s||s==='-'||s==='—')return null;let n=Number(s);return Number.isFinite(n)?n:null}
+function parseDate(v){if(v==null||v==='')return null;if(typeof v==='number'&&v>20000&&v<80000){return new Date(Date.UTC(1899,11,30)+v*86400000)}let s=String(v).trim();let d=new Date(s);if(!isNaN(d))return d;let m=s.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{2,4})$/);if(m){let a=+m[1],b=+m[2],y=+m[3];if(y<100)y+=2000;return new Date(y,b-1,a)}return null}
+function fmtDate(d){return d?d.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric',timeZone:'UTC'}):'—'}
+function money(v){return v==null?'—':new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR',maximumFractionDigits:2}).format(v)}
+function detectColumns(data){headers=Object.keys(data[0]||{});dateKey=headers.find(h=>/(date|day|time|recorded on)/i.test(h))||headers.find(h=>data.some(r=>parseDate(r[h])));rateKeys=headers.filter(h=>/(gold|rate|price|24k|22k|18k|karat|carat|per gram|10 gram)/i.test(h)&&!/(date|change|percent|%)/i.test(h));if(!rateKeys.length)rateKeys=headers.filter(h=>h!==dateKey&&data.some(r=>num(r[h])!==null));}
+function dateOf(r){return parseDate(r[dateKey])}
+function cleanData(data){return data.filter(r=>r&&Object.values(r).some(v=>String(v??'').trim()!=='')).map(r=>({...r,__date:dateKey?dateOf(r):null})).filter(r=>r.__date||!dateKey)}
+function sorted(){return [...rows].sort((a,b)=>(a.__date?.getTime()||0)-(b.__date?.getTime()||0))}
+function detectRateType(h){let s=norm(h);if(/24 k|24k|24 carat|24 karat/.test(s))return '24';if(/22 k|22k|22 carat|22 karat/.test(s))return '22';if(/18 k|18k|18 carat|18 karat/.test(s))return '18';return ''}
+function unitMultiplier(h){let s=norm(h);if(/10 gram|10g|per 10|10 grams/.test(s))return 1;if(/gram|per g|\/g\b/.test(s))return 10;return null}
+function latestValue(key){const valid=sorted().filter(r=>num(r[key])!==null);return valid.length?num(valid[valid.length-1][key]):null}
+function rateKeyFor(purity){return rateKeys.find(k=>detectRateType(k)===purity)||null}
+function drawSummary(){let s=sorted(),valid=s.filter(r=>r.__date);let latest=valid.at(-1);$('latestDate').textContent=latest?fmtDate(latest.__date):'—';$('recordCount').textContent=String(rows.length);$('dateRange').textContent=valid.length?fmtDate(valid[0].__date)+' – '+fmtDate(valid.at(-1).__date):'—';
+  for(let p of ['24','22']){let k=rateKeyFor(p),v=latest&&k?num(latest[k]):null;$('rate'+p).textContent=v==null?'—':money(v);$('rate'+p+'sub').textContent=k?`${k} · source units`:'No matching purity column found';let mult=k?unitMultiplier(k):null;$('ten'+p).textContent=v==null||mult===null?'—':money(v*mult)}
+  const k=rateKeyFor('24')||rateKeys[0];let vals=k?s.filter(r=>num(r[k])!==null):[];if(vals.length>=2){let a=num(vals.at(-1)[k]),b=num(vals.at(-2)[k]),delta=a-b,pct=b?delta/b*100:null;$('dailyChange').textContent=(delta>0?'+':'')+money(delta);$('dailyChange').style.color=delta>0?'var(--green)':delta<0?'var(--red)':'var(--ink)';$('dailyChangeSub').textContent=pct===null?'Compared with previous record':`${pct>0?'+':''}${pct.toFixed(2)}% vs previous record`} }else{$('dailyChange').textContent='—';$('dailyChange').style.color='var(--ink)';$('dailyChangeSub').textContent='Requires at least two numeric records'}
+}
+function setFilters(){let s=sorted().filter(r=>r.__date);if(s.length){$('fromDate').value=s[0].__date.toISOString().slice(0,10);$('toDate').value=s.at(-1).__date.toISOString().slice(0,10)}}
+function setupSelect(){let sel=$('puritySelect');sel.innerHTML='<option value="auto">Auto-detect rate</option>'+rateKeys.map(k=>`<option value="${escapeHtml(k)}">${escapeHtml(k)}</option>`).join('')}
+function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function filtered(){let from=$('fromDate').value?new Date($('fromDate').value+'T00:00:00Z'):null,to=$('toDate').value?new Date($('toDate').value+'T23:59:59Z'):null,q=norm($('tableSearch').value);return sorted().filter(r=>(!from||!r.__date||r.__date>=from)&&(!to||!r.__date||r.__date<=to)&&(!q||headers.some(h=>norm(r[h]).includes(q))))}
+function drawChart(){let key=$('puritySelect').value==='auto'?(rateKeyFor('24')||rateKeys[0]):$('puritySelect').value;let data=filtered().filter(r=>r.__date&&key&&num(r[key])!==null);let ctx=$('goldChart').getContext('2d');if(chart)chart.destroy();chart=new Chart(ctx,{type:'line',data:{labels:data.map(r=>fmtDate(r.__date)),datasets:[{label:key||'Gold rate',data:data.map(r=>num(r[key])),borderColor:'#c99a24',backgroundColor:'rgba(201,154,36,.13)',fill:true,tension:.25,pointRadius:data.length>80?0:2,pointHoverRadius:5,borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{display:true},tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${money(c.parsed.y)}`}}},scales:{x:{ticks:{maxTicksLimit:8,maxRotation:0},grid:{display:false}},y:{ticks:{callback:v=>new Intl.NumberFormat('en-IN',{notation:'compact',maximumFractionDigits:1}).format(v)},grid:{color:'#eef0f4'}}}}});}
+function drawTable(){let list=filtered().reverse().slice(0,500);$('tableHead').innerHTML='<tr>'+headers.map(h=>`<th>${escapeHtml(h)}</th>`).join('')+'</tr>';if(!list.length){$('tableBody').innerHTML=`<tr><td class="empty" colspan="${Math.max(headers.length,1)}">No records match the current filters.</td></tr>`;return}$('tableBody').innerHTML=list.map(r=>'<tr>'+headers.map(h=>`<td>${escapeHtml(r[h]??'—')}</td>`).join('')+'</tr>').join('')}
+function render(){drawSummary();setupSelect();drawChart();drawTable();$('todayLabel').textContent='Updated view · '+new Date().toLocaleDateString('en-IN')}
+function loadRows(data,label='spreadsheet'){if(!data||!data.length){status('No data rows found. Check that the first row contains column headers.','error');return}detectColumns(data);rows=cleanData(data);if(!rows.length){status('Data was loaded, but no recognizable date records were found. Check your date column.','error');return}setFilters();render();status(`Loaded ${rows.length} records from ${label}. Detected date column: ${dateKey||'not identified'}; rate columns: ${rateKeys.join(', ')||'none detected'}.`,'ok')}
+function csvUrl(){let raw=$('sheetUrl').value.trim();let m=raw.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);let id=m?m[1]:SHEET_ID;let gidMatch=raw.match(/[?#&]gid=(\d+)/);let gid=gidMatch?gidMatch[1]:'0';return `https://docs.google.com/spreadsheets/d/${id}/export?format=csv&gid=${gid}`}
+async function loadSheet(){status('Connecting to the public Google Sheet…');try{let res=await fetch(csvUrl());if(!res.ok)throw new Error('Google returned HTTP '+res.status+'. Check public sharing settings.');let text=await res.text();if(/<html|accounts\.google\.com|Sign in/i.test(text.slice(0,1000)))throw new Error('Google returned a sign-in or HTML page. Set General access to “Anyone with the link — Viewer”.');Papa.parse(text,{header:true,skipEmptyLines:'greedy',complete:r=>{if(r.errors?.length&& !r.data.length){status('Could not parse CSV: '+r.errors[0].message,'error');return}loadRows(r.data,'Google Sheets')},error:e=>status('CSV parsing failed: '+e.message,'error')})}catch(e){status('Could not load the sheet automatically: '+e.message+' You can download File → Download → CSV and upload it below.','error')}}
+$('loadBtn').addEventListener('click',loadSheet);
+$('csvFile').addEventListener('change',e=>{let f=e.target.files[0];if(!f)return;Papa.parse(f,{header:true,skipEmptyLines:'greedy',complete:r=>loadRows(r.data,f.name),error:e=>status('Could not read CSV: '+e.message,'error')})});
+$('puritySelect').addEventListener('change',drawChart);['fromDate','toDate','tableSearch'].forEach(id=>$(id).addEventListener(id==='tableSearch'?'input':'change',()=>{drawChart();drawTable()}));
+$('demoBtn').addEventListener('click',()=>{rows=[];headers=[];rateKeys=[];dateKey=null;if(chart){chart.destroy();chart=null}['latestDate','rate24','rate22','dailyChange','ten24','ten22','dateRange'].forEach(id=>$(id).textContent='—');$('recordCount').textContent='0';$('rate24sub').textContent='No verified rate loaded';$('rate22sub').textContent='No verified rate loaded';$('dailyChangeSub').textContent='Requires at least two dates';$('puritySelect').innerHTML='<option value="auto">Auto-detect rate</option>';$('tableHead').innerHTML='';$('tableBody').innerHTML='<tr><td class="empty">Load a public sheet or upload a CSV to see records.</td></tr>';status('View reset. No sample prices are displayed.')});
+loadSheet();
+</script>
+</body>
+</html>
